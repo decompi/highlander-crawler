@@ -1,12 +1,15 @@
-import { SEEDS } from "./config/njit"
+import { close } from "fs";
+import { HighlanderCrawler } from "./crawl/crawler";
+import { closeBrowser } from "./crawl/renderer";
 
 async function main() {
     console.log("Highlander Crawler starting...")
-    console.log("Seeds: ", SEEDS)
-
+    const crawler = new HighlanderCrawler()
+    await crawler.run()
+    await closeBrowser()
 }
 
 main().catch((err) => {
-    console.error(err)
+    console.error("Fatal error:", err)
     process.exit(1)
 })
