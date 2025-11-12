@@ -5,12 +5,10 @@ import { fetchHtml } from "./fetcher";
 import { renderHtmlWithPuppeteer, closeBrowser } from "./renderer";
 import { extractFromHtml } from "./extractor";
 import { needsDynamicRendering } from "./classifier";
-import { appendPage } from "../storage/fileStorage";
+import { appendPage, hasPage} from "../storage/fileStorage";
 import type { PageRecord } from "../storage/types";
 import { CRAWL_DELAY_MS } from "../config/njit";
 import { debugLog } from "../lib/log";
-import { title } from "node:process";
-import { debug } from "node:console";
 
 const NON_HTML_EXTS = [
     ".pdf",
@@ -63,12 +61,12 @@ export class HighlanderCrawler {
 
     constructor() {
         SEEDS.forEach((url) => {
-            const norm = normalizeUrl(url)
-            if(norm) {
-                this.queue.enqueue({
-                    url: norm,
-                    depth: 0
-                })
+            const norm = normalizeUrl(url);
+            if (norm && !hasPage(norm)) {
+                this.queue.enqueue({ 
+                    url: norm, 
+                    depth: 0 
+                });
             }
         })
     }
@@ -98,6 +96,11 @@ export class HighlanderCrawler {
             let { html, finalUrl} = htmlResult
 
             let effectiveUrl = normalizeUrl(finalUrl) ?? finalUrl
+            if (hasPage(effectiveUrl)) {
+                debugLog("Already in corpus, skipping", effectiveUrl);
+                await this.politeDelay();
+                continue;
+            }
             let extracted = extractFromHtml(html, effectiveUrl)
 
             if(extracted.canonicalUrl) {
@@ -157,7 +160,7 @@ export class HighlanderCrawler {
             if(depth + 1 <= MAX_DEPTH) {
                 for(const link of extracted.links) {
                     const norm = normalizeUrl(link)
-                    if(!norm || this.queue.hasVisitied(norm)) {
+                    if(!norm || this.queue.hasVisited(norm) || hasPage(norm)) {
                         continue
                     }
                     this.queue.enqueue({

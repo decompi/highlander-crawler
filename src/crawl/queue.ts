@@ -43,7 +43,7 @@ export class UrlQueue {
         return this.queue.length > 0
     }
 
-    hasVisitied(url: string) {
+    hasVisited(url: string) {
         return this.visited.has(normalizeUrlForKey(url))
     }
 }
