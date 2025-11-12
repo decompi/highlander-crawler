@@ -9,5 +9,6 @@ export type PageRecord = {
 export type ExtractedPage = {
     title: string,
     text: string,
-    links: string[]
+    links: string[],
+    canonicalUrl?: string
 }

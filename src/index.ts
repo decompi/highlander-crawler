@@ -6,7 +6,6 @@ async function main() {
     console.log("Highlander Crawler starting...")
     const crawler = new HighlanderCrawler()
     await crawler.run()
-    await closeBrowser()
 }
 
 main().catch((err) => {

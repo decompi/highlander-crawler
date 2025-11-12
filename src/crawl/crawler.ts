@@ -1,34 +1,72 @@
-import { UrlQueue, QueueItem } from "./queue";
+import path from "node:path";
+import { UrlQueue } from "./queue";
 import { SEEDS, ALLOWED_DOMAINS, MAX_DEPTH, MAX_PAGES } from "../config/njit";
 import { fetchHtml } from "./fetcher";
-import { renderHtmlWithPuppeteer } from "./renderer";
+import { renderHtmlWithPuppeteer, closeBrowser } from "./renderer";
 import { extractFromHtml } from "./extractor";
 import { needsDynamicRendering } from "./classifier";
 import { appendPage } from "../storage/fileStorage";
 import type { PageRecord } from "../storage/types";
-import { html } from "cheerio/dist/commonjs/static";
-import { append } from "cheerio/dist/commonjs/api/manipulation";
 
-function isAllowedUrl(url: string): boolean {
+
+const NON_HTML_EXTS = [
+    ".pdf",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".ico",
+    ".css",
+    ".js",
+    ".zip",
+    ".mp4",
+    ".mp3",
+]
+
+function normalizeUrl(url: string): string | null {
     try {
         const u = new URL(url)
-        return ALLOWED_DOMAINS.some((d) => {
+
+        if(!ALLOWED_DOMAINS.some((d) => {
             return u.hostname.endsWith(d)
-        })
+        })) {
+            return null
+        }
+
+        if(u.protocol !== "http:" && u.protocol !== "https:") {
+            return null
+        }
+
+        u.hash = ""
+
+        const ext = path.extname(u.pathname).toLowerCase()
+        if(ext && NON_HTML_EXTS.includes(ext)) {
+            return null
+        }
+
+        return u.toString()
     } catch {
-        return false
+        return null
     }
 }
 
 export class HighlanderCrawler {
-    private queue = new UrlQueue
+    private queue = new UrlQueue()
     private processedCount = 0
+    private puppeteerUsed = 0
+    private static MAX_PUPPETEER_PAGES = 50
+
 
     constructor() {
         SEEDS.forEach((url) => {
-            this.queue.enqueue({ url,
-                depth: 0
-            })
+            const norm = normalizeUrl(url)
+            if(norm) {
+                this.queue.enqueue({
+                    url: norm,
+                    depth: 0
+                })
+            }
         })
     }
 
@@ -49,16 +87,30 @@ export class HighlanderCrawler {
 
             let { html, finalUrl} = htmlResult
 
-            let extracted = extractFromHtml(html, finalUrl)
+            let effectiveUrl = normalizeUrl(finalUrl) ?? finalUrl
+            let extracted = extractFromHtml(html, effectiveUrl)
+
+            if(extracted.canonicalUrl) {
+                const canon = normalizeUrl(extracted.canonicalUrl)
+                if(canon) {
+                    effectiveUrl = canon
+                }
+            }
 
             let record: PageRecord | null = null;
-            if(needsDynamicRendering(html, extracted.text)) {
-                const rendered = await renderHtmlWithPuppeteer(finalUrl)
+
+            const shouldTryPuppeteer = 
+                needsDynamicRendering(html, extracted.text) &&
+                this.puppeteerUsed < HighlanderCrawler.MAX_PUPPETEER_PAGES
+
+            if(shouldTryPuppeteer) {
+                const rendered = await renderHtmlWithPuppeteer(effectiveUrl)
                 if(rendered) {
+                    this.puppeteerUsed += 1
                     html = rendered
-                    extracted = extractFromHtml(html, finalUrl)
+                    extracted = extractFromHtml(html, effectiveUrl)
                     record = {
-                        url: finalUrl,
+                        url: effectiveUrl,
                         title: extracted.title,
                         text: extracted.text,
                         discoveredAt: new Date().toISOString(),
@@ -72,7 +124,7 @@ export class HighlanderCrawler {
             }
             if(record == null) {
                 record = {
-                    url: finalUrl,
+                    url: effectiveUrl,
                     title: extracted.title,
                     text: extracted.text,
                     discoveredAt: new Date().toISOString(),
@@ -85,11 +137,12 @@ export class HighlanderCrawler {
 
             if(depth + 1 <= MAX_DEPTH) {
                 for(const link of extracted.links) {
-                    if(!isAllowedUrl(link)) {
+                    const norm = normalizeUrl(link)
+                    if(!norm || this.queue.hasVisitied(norm)) {
                         continue
                     }
                     this.queue.enqueue({
-                        url: link,
+                        url: norm,
                         depth: depth + 1
                     })
                 }
@@ -101,5 +154,6 @@ export class HighlanderCrawler {
         }
         
         console.log("Crawl finished. Pages processed:", this.processedCount)
+        await closeBrowser()
     }
 }
