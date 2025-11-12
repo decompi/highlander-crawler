@@ -1,6 +1,7 @@
-import { close } from "fs";
+
+import "dotenv/config"
+
 import { HighlanderCrawler } from "./crawl/crawler";
-import { closeBrowser } from "./crawl/renderer";
 
 async function main() {
     console.log("Highlander Crawler starting...")

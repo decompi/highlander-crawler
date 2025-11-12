@@ -37,7 +37,7 @@ export async function savePageToSupabase(record: PageRecord) {
         url: record.url,
         title: record.title,
         text: record.text,
-        discoveredAt: record.discoveredAt,
+        discovered_at: record.discoveredAt,
         source: record.source
     }, {
         onConflict: "url"
