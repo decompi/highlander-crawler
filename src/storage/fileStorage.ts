@@ -36,7 +36,7 @@ export async function savePageToSupabase(record: PageRecord) {
     const { error } = await supabase.from("njit_docs").upsert({
         url: record.url,
         title: record.title,
-        text: record.text,
+        content: record.text,
         discovered_at: record.discoveredAt,
         source: record.source
     }, {
