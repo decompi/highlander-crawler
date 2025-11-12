@@ -6,3 +6,6 @@ export const ALLOWED_DOMAINS = [
 ]
 export const MAX_PAGES = 500
 export const MAX_DEPTH = 5
+
+export const CRAWL_DELAY_MS = 1500
+export const DEBUG = true

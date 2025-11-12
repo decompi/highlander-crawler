@@ -7,7 +7,10 @@ import { extractFromHtml } from "./extractor";
 import { needsDynamicRendering } from "./classifier";
 import { appendPage } from "../storage/fileStorage";
 import type { PageRecord } from "../storage/types";
-
+import { CRAWL_DELAY_MS } from "../config/njit";
+import { debugLog } from "../lib/log";
+import { title } from "node:process";
+import { debug } from "node:console";
 
 const NON_HTML_EXTS = [
     ".pdf",
@@ -71,17 +74,24 @@ export class HighlanderCrawler {
     }
 
     async run() {
+        const start = Date.now()
+
         while(this.queue.hasNext() && this.processedCount < MAX_PAGES) {
             let item = this.queue.dequeue()
             if(!item) {
                 break
             }
 
+            const pageStart = Date.now()
             const { url, depth} = item
+
+            debugLog(`Dequeued`, {url, depth})
             console.log(`[${this.processedCount}/${MAX_PAGES}] Visiting`, url, "depth", depth)
 
             const htmlResult = await fetchHtml(url)
             if(!htmlResult) {
+                debugLog("Fetch failed, skipping", url)
+                await this.politeDelay()
                 continue
             }
 
@@ -133,7 +143,16 @@ export class HighlanderCrawler {
             }
             
             appendPage(record)
+            debugLog("Saved Page", {
+                url: record.url,
+                title: record.title.slice(0, 89),
+                textLen: record.text.length,
+                source: record.source
+            })
             this.processedCount++
+
+            const pageMs = Date.now() - pageStart
+            debugLog(`Page processed in ${pageMs}ms`)
 
             if(depth + 1 <= MAX_DEPTH) {
                 for(const link of extracted.links) {
@@ -148,12 +167,19 @@ export class HighlanderCrawler {
                 }
             }
 
-            await new Promise((r) => {
-                return setTimeout(r, 500)
-            })
+            await this.politeDelay()
         }
-        
+        const totalMs = Date.now() - start
         console.log("Crawl finished. Pages processed:", this.processedCount)
+        console.log(`Total time: ${(totalMs / 1000).toFixed(1)}s`)
         await closeBrowser()
+    }
+
+    private async politeDelay() {
+        const jitter = Math.floor(Math.random() * 500)
+        const delay = CRAWL_DELAY_MS + jitter
+        await new Promise((r) => {
+            return setTimeout(r, delay)
+        })
     }
 }

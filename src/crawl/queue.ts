@@ -3,6 +3,7 @@ export type QueueItem = {
     depth: number
 }
 
+
 function normalizeUrlForKey(url: string): string {
     try {
         let u = new URL(url)
