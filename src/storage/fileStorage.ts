@@ -1,7 +1,8 @@
 import fs from "node:fs"
 import path from "node:path"
 import { PageRecord } from "./types"
-import { Page } from "puppeteer"
+import { supabase } from "./supbaseClient"
+
 
 const dataDir = path.join(process.cwd(), "data")
 const corpusFile = path.join(dataDir, "corpus.jsonl")
@@ -28,6 +29,22 @@ if(fs.existsSync(corpusFile)) {
         } catch {
 
         }
+    }
+}
+
+export async function savePageToSupabase(record: PageRecord) {
+    const { error } = await supabase.from("njit_docs").upsert({
+        url: record.url,
+        title: record.title,
+        text: record.text,
+        discoveredAt: record.discoveredAt,
+        source: record.source
+    }, {
+        onConflict: "url"
+    })
+
+    if(error) {
+        console.error('Supabase error when saving page', error)
     }
 }
 

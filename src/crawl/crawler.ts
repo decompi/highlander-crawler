@@ -5,7 +5,7 @@ import { fetchHtml } from "./fetcher";
 import { renderHtmlWithPuppeteer, closeBrowser } from "./renderer";
 import { extractFromHtml } from "./extractor";
 import { needsDynamicRendering } from "./classifier";
-import { appendPage, hasPage} from "../storage/fileStorage";
+import { appendPage, hasPage, savePageToSupabase } from "../storage/fileStorage";
 import type { PageRecord } from "../storage/types";
 import { CRAWL_DELAY_MS } from "../config/njit";
 import { debugLog } from "../lib/log";
@@ -146,6 +146,7 @@ export class HighlanderCrawler {
             }
             
             appendPage(record)
+            await savePageToSupabase(record)
             debugLog("Saved Page", {
                 url: record.url,
                 title: record.title.slice(0, 89),
